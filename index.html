@@ -1,5 +1,4 @@
-<!DOCTYPE html>
-<html lang="ur">
+<!DOCTYPE html><html lang="ur">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -29,28 +28,18 @@ th { background:#1976d2; color:white; position:sticky; top:0; z-index:2;}
 <button style="background:red;color:white;" onclick="withdraw()">Withdraw</button>
 <div id="timer">30</div>
 <button id="option1">BIG</button>
-<button id="option2">SMALL</button>
-
-<h3>Last 50 Results</h3>
+<button id="option2">SMALL</button><h3>Last 50 Results</h3>
 <div class="tableContainer">
 <table id="table">
 <tr><th>Round</th><th>Win</th></tr>
 </table>
-</div>
-
-<h3>Daily Deposit & Withdraw Record</h3>
+</div><h3>Daily Deposit & Withdraw Record</h3>
 <div class="tableContainer">
 <table id="dailyTable">
 <tr><th>Date</th><th>Deposit</th><th>Withdraw</th><th>Status</th><th>Reason</th></tr>
 </table>
 </div>
-</div>
-
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
-
-<script>
-// ===== Firebase Config =====
+</div><script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script><script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script><script>
 const firebaseConfig = {
   apiKey: "AIzaSyA5CeMKIv2ss5O2ha7TuWEZUM9rL3mA1CY",
   authDomain: "singo-274c9.firebaseapp.com",
@@ -63,17 +52,29 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
-// ===== Permanent User ID + IP check =====
 let userId = localStorage.getItem("uid");
-if(!userId){
-    userId = 'anon_'+Math.floor(Math.random()*999999)+'_'+Date.now();
-    localStorage.setItem("uid", userId);
+
+async function getUserId(){
+    if(userId){
+        document.body.insertAdjacentHTML("afterbegin", `<div style="background:black;color:white;padding:5px;font-size:12px;">USER ID: ${userId}</div>`);
+        return userId;
+    }
+    try{
+        const res = await fetch("https://api.ipify.org?format=json");
+        const data = await res.json();
+        const device = navigator.userAgent.replace(/\W/g,'').slice(0,20);
+        userId = "UID_" + data.ip.replace(/\./g,'') + "_" + device;
+        localStorage.setItem("uid", userId);
+    }catch(e){
+        userId = "UID_" + Date.now();
+        localStorage.setItem("uid", userId);
+    }
+    document.body.insertAdjacentHTML("afterbegin", `<div style="background:black;color:white;padding:5px;font-size:12px;">USER ID: ${userId}</div>`);
+    return userId;
 }
 
-// ===== Variables =====
 let balance=0, results=[], selected=null, betAmount=0, round=0, timerVal=30, totalDeposit=0;
 
-// ===== Load User Data =====
 function loadUserData(){
     db.ref('users/'+userId).once('value').then(snap=>{
         const data = snap.val();
@@ -87,13 +88,9 @@ function loadUserData(){
         updateDailyRecord();
     });
 }
-loadUserData();
+getUserId().then(()=>{ loadUserData(); });
 
-// ===== UI Update =====
-function updateUI(){
-    document.getElementById("balance").innerText = "BALANCE = "+balance.toFixed(2)+" RS";
-    renderTable();
-}
+function updateUI(){ document.getElementById("balance").innerText = "BALANCE = "+balance.toFixed(2)+" RS"; renderTable(); }
 function renderTable(){
     let t = document.getElementById("table");
     t.innerHTML="<tr><th>Round</th><th>Win</th></tr>";
@@ -104,37 +101,26 @@ function renderTable(){
     });
 }
 
-// ===== Betting =====
 function bet(opt){
     if(selected) return alert("Only 1 bet per round");
     let amt = parseFloat(prompt("Enter bet (min 1)","1"));
     if(!amt || amt<1 || amt>balance) return alert("Invalid bet / exceeds balance");
-
     selected = opt; betAmount = amt; balance -= amt;
     db.ref('users/'+userId+'/balance').set(balance);
-
     alert(`✅ Bet Placed!\nOption: ${opt===1?'SMALL':'BIG'}\nAmount: ${amt.toFixed(2)} RS`);
-
-    // Update total bets
     db.ref('users/'+userId+'/totalBets').once('value').then(snap=>{
-        let tb = snap.val()||0;
-        tb += amt;
-        db.ref('users/'+userId+'/totalBets').set(tb);
+        let tb = snap.val()||0; tb += amt; db.ref('users/'+userId+'/totalBets').set(tb);
     });
-
-    // Save current bet
     db.ref('users/'+userId+'/currentBet').set({option:opt, amount:amt, round:round+1});
 }
 document.getElementById("option1").onclick = ()=>bet(2);
 document.getElementById("option2").onclick = ()=>bet(1);
 
-// ===== Run Round =====
 function runRound(){
     round++;
     db.ref('users').once('value').then(snap=>{
         let online = snap.numChildren();
         let option1Total=0, option2Total=0;
-
         snap.forEach(userSnap=>{
             const u = userSnap.val();
             if(u.currentBet && u.currentBet.round===round){
@@ -142,31 +128,30 @@ function runRound(){
                 if(u.currentBet.option===2) option2Total += u.currentBet.amount;
             }
         });
-
         let winOption;
         if(online>1) winOption = option1Total<=option2Total ? 1 : 2;
-        else winOption = Math.random()<0.5 ? 1 : 2;
-
+        else { winOption = Math.random()<0.5 ? 1 : 2; } // single live random
         snap.forEach(userSnap=>{
             const uid = userSnap.key;
             const u = userSnap.val();
             if(u.currentBet && u.currentBet.round===round){
                 let reward = 0;
+                let singleLive = online===1;
                 if(u.currentBet.option===winOption){
                     reward = u.currentBet.amount*1.9;
-                    if(online===1 && reward>199) reward=199;
-                    alert(`🎉 You Won!\nRound: ${round}\nOption: ${winOption===1?'SMALL':'BIG'}\nReward: ${reward.toFixed(2)} RS`);
+                    if(singleLive && reward>199) reward=199;
                 } else {
-                    alert(`😞 You Lost!\nRound: ${round}\nOption: ${u.currentBet.option===1?'SMALL':'BIG'}\nLost Amount: ${u.currentBet.amount.toFixed(2)} RS`);
+                    reward = 0;
+                }
+                if(singleLive){
+                    // Single live always slightly loses in total
+                    reward = Math.min(reward, 199);
                 }
                 const newBalance = (u.balance||0)+reward;
                 db.ref('users/'+uid+'/balance').set(newBalance);
-
-                let res = u.results||[];
-                res.push({r:round, w:winOption});
+                let res = u.results||[]; res.push({r:round, w:winOption});
                 if(res.length>50) res.shift();
                 db.ref('users/'+uid+'/results').set(res);
-
                 db.ref('users/'+uid+'/currentBet').remove();
             }
         });
@@ -174,14 +159,12 @@ function runRound(){
     });
 }
 
-// ===== Timer =====
 setInterval(()=>{
     timerVal--;
     document.getElementById("timer").innerText = timerVal;
     if(timerVal<=0){ timerVal=30; runRound(); selected=null; }
 },1000);
 
-// ===== Deposit & Withdraw =====
 function deposit(){
     const name=prompt("Name"), method=prompt("Method"), account=prompt("Account"), trx=prompt("Transaction ID");
     const amt=parseFloat(prompt("Deposit Amount (Min 100)","100"));
@@ -200,19 +183,13 @@ function withdraw(){
         const b = u.balance || 0;
         const totalDep = u.totalDeposit || 0;
         const totalBets = u.totalBets || 0;
-
         if(b<=0){ alert("Withdraw not allowed!"); return; }
-
         const remainingBet = totalDep - totalBets;
-        if(remainingBet>0){
-            alert("Withdraw not allowed! You must bet "+remainingBet.toFixed(2)+" RS more before withdrawing.");
-            return;
-        }
-
+        if(remainingBet>0){ alert("Withdraw not allowed! You must bet "+remainingBet.toFixed(2)+" RS more before withdrawing."); return; }
+        if(snap.numChildren()===1){ alert("Single live player cannot withdraw large amounts"); return; }
         const name=prompt("Name"), method=prompt("Method"), account=prompt("Account");
         const amt=parseFloat(prompt("Withdraw Amount","200"));
         if(!name||!method||!account||!amt||amt<1) return alert("All fields required");
-
         db.ref('requests').push({user:userId,name,method,account,type:'withdraw',amount:amt,status:'pending',date:new Date().toLocaleDateString()});
         db.ref('users/'+userId+'/dailyHistory').push({date:new Date().toLocaleDateString(),deposit:0,withdraw:amt,status:'pending',reason:''});
         alert("Withdraw request sent!");
@@ -220,23 +197,15 @@ function withdraw(){
     });
 }
 
-// ===== Daily Record =====
 function updateDailyRecord(){
     const t = document.getElementById("dailyTable");
     t.innerHTML="<tr><th>Date</th><th>Deposit</th><th>Withdraw</th><th>Status</th><th>Reason</th></tr>";
     db.ref('users/'+userId+'/dailyHistory').once('value').then(snap=>{
         snap.forEach(s=>{
             const h=s.val();
-            t.innerHTML += `<tr>
-                <td>${h.date}</td>
-                <td>${h.deposit}</td>
-                <td>${h.withdraw}</td>
-                <td>${h.status||''}</td>
-                <td>${h.reason||''}</td>
-            </tr>`;
+            t.innerHTML += `<tr><td>${h.date}</td><td>${h.deposit}</td><td>${h.withdraw}</td><td>${h.status||''}</td><td>${h.reason||''}</td></tr>`;
         });
     });
 }
-</script>
-</body>
+</script></body>
 </html>
