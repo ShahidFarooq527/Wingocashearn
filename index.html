@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="ur">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Wingo Game - User</title>
+<style>
+body { font-family: Arial; background:#eef3ff; text-align:center; margin:0; padding:0; }
+.container { max-width:700px; margin:auto; padding:20px; }
+h2 { color:#0d47a1; font-size:40px;}
+button { padding:10px 16px; margin:5px; border:none; border-radius:10px; cursor:pointer; font-size:14px; transition:0.3s; }
+button:hover:not(:disabled){transform:scale(1.05);}
+button:disabled{background:green;color:white; cursor:not-allowed;}
+#option1 { background:#4caf50; color:white; } /* BIG */
+#option2 { background:#f44336; color:white; } /* SMALL */
+#timer { font-size:26px; color:green; margin:10px; font-weight:bold; }
+#balance { font-size:20px; font-weight:bold; margin-bottom:15px; }
+.tableContainer { max-height:300px; overflow-y:auto; border:1px solid #ccc; margin-top:15px; }
+table { width:100%; border-collapse:separate; table-layout:fixed; word-wrap:break-word; font-size:12px; }
+th, td { border:1px solid #ddd; padding:4px 6px; text-align:center; white-space:normal; overflow-wrap:break-word; border-radius:6px; }
+th { background:#1976d2; color:white; position:sticky; top:0; z-index:2;}
+</style>
+</head>
+<body>
+<div class="container">
+<h2>Wingo Game</h2>
+<div id="balance">BALANCE = 0.00 RS</div>
+<button style="background:green;color:white;" onclick="deposit()">Deposit</button>
+<button style="background:red;color:white;" onclick="withdraw()">Withdraw</button>
+<div id="timer">30</div>
+<button id="option1">BIG</button>
+<button id="option2">SMALL</button>
+
+<h3>Last 50 Results</h3>
+<div class="tableContainer">
+<table id="table">
+<tr><th>Round</th><th>Win</th></tr>
+</table>
+</div>
+
+<h3>Daily Deposit & Withdraw Record</h3>
+<div class="tableContainer">
+<table id="dailyTable">
+<tr><th>Date</th><th>Deposit</th><th>Withdraw</th><th>Status</th><th>Reason</th></tr>
+</table>
+</div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+
+<script>
+// ===== Firebase Config =====
+const firebaseConfig = {
+  apiKey: "AIzaSyA5CeMKIv2ss5O2ha7TuWEZUM9rL3mA1CY",
+  authDomain: "singo-274c9.firebaseapp.com",
+  databaseURL: "https://singo-274c9-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "singo-274c9",
+  storageBucket: "singo-274c9.appspot.com",
+  messagingSenderId: "350557755356",
+  appId: "1:350557755356:web:49bab09aee8aa53d84a119"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+
+// ===== Permanent User ID + IP check =====
+let userId = localStorage.getItem("uid");
+if(!userId){
+    userId = 'anon_'+Math.floor(Math.random()*999999)+'_'+Date.now();
+    localStorage.setItem("uid", userId);
+}
+
+// ===== Variables =====
+let balance=0, results=[], selected=null, betAmount=0, round=0, timerVal=30, totalDeposit=0;
+
+// ===== Load User Data =====
+function loadUserData(){
+    db.ref('users/'+userId).once('value').then(snap=>{
+        const data = snap.val();
+        if(data){
+            balance = data.balance || 0;
+            results = data.results || [];
+            totalDeposit = data.totalDeposit || 0;
+            round = data.lastRound || 0;
+        }
+        updateUI();
+        updateDailyRecord();
+    });
+}
+loadUserData();
+
+// ===== UI Update =====
+function updateUI(){
+    document.getElementById("balance").innerText = "BALANCE = "+balance.toFixed(2)+" RS";
+    renderTable();
+}
+function renderTable(){
+    let t = document.getElementById("table");
+    t.innerHTML="<tr><th>Round</th><th>Win</th></tr>";
+    results.slice(-50).forEach(r=>{
+        let winText = r.w===1 ? "SMALL" : "BIG";
+        let color = r.w===1 ? "#f44336" : "#4caf50";
+        t.innerHTML += `<tr><td>${r.r}</td><td style="color:${color}; font-weight:bold;">${winText}</td></tr>`;
+    });
+}
+
+// ===== Betting =====
+function bet(opt){
+    if(selected) return alert("Only 1 bet per round");
+    let amt = parseFloat(prompt("Enter bet (min 1)","1"));
+    if(!amt || amt<1 || amt>balance) return alert("Invalid bet / exceeds balance");
+
+    selected = opt; betAmount = amt; balance -= amt;
+    db.ref('users/'+userId+'/balance').set(balance);
+
+    alert(`✅ Bet Placed!\nOption: ${opt===1?'SMALL':'BIG'}\nAmount: ${amt.toFixed(2)} RS`);
+
+    // Update total bets
+    db.ref('users/'+userId+'/totalBets').once('value').then(snap=>{
+        let tb = snap.val()||0;
+        tb += amt;
+        db.ref('users/'+userId+'/totalBets').set(tb);
+    });
+
+    // Save current bet
+    db.ref('users/'+userId+'/currentBet').set({option:opt, amount:amt, round:round+1});
+}
+document.getElementById("option1").onclick = ()=>bet(2);
+document.getElementById("option2").onclick = ()=>bet(1);
+
+// ===== Run Round =====
+function runRound(){
+    round++;
+    db.ref('users').once('value').then(snap=>{
+        let online = snap.numChildren();
+        let option1Total=0, option2Total=0;
+
+        snap.forEach(userSnap=>{
+            const u = userSnap.val();
+            if(u.currentBet && u.currentBet.round===round){
+                if(u.currentBet.option===1) option1Total += u.currentBet.amount;
+                if(u.currentBet.option===2) option2Total += u.currentBet.amount;
+            }
+        });
+
+        let winOption;
+        if(online>1) winOption = option1Total<=option2Total ? 1 : 2;
+        else winOption = Math.random()<0.5 ? 1 : 2;
+
+        snap.forEach(userSnap=>{
+            const uid = userSnap.key;
+            const u = userSnap.val();
+            if(u.currentBet && u.currentBet.round===round){
+                let reward = 0;
+                if(u.currentBet.option===winOption){
+                    reward = u.currentBet.amount*1.9;
+                    if(online===1 && reward>199) reward=199;
+                    alert(`🎉 You Won!\nRound: ${round}\nOption: ${winOption===1?'SMALL':'BIG'}\nReward: ${reward.toFixed(2)} RS`);
+                } else {
+                    alert(`😞 You Lost!\nRound: ${round}\nOption: ${u.currentBet.option===1?'SMALL':'BIG'}\nLost Amount: ${u.currentBet.amount.toFixed(2)} RS`);
+                }
+                const newBalance = (u.balance||0)+reward;
+                db.ref('users/'+uid+'/balance').set(newBalance);
+
+                let res = u.results||[];
+                res.push({r:round, w:winOption});
+                if(res.length>50) res.shift();
+                db.ref('users/'+uid+'/results').set(res);
+
+                db.ref('users/'+uid+'/currentBet').remove();
+            }
+        });
+        updateUI();
+    });
+}
+
+// ===== Timer =====
+setInterval(()=>{
+    timerVal--;
+    document.getElementById("timer").innerText = timerVal;
+    if(timerVal<=0){ timerVal=30; runRound(); selected=null; }
+},1000);
+
+// ===== Deposit & Withdraw =====
+function deposit(){
+    const name=prompt("Name"), method=prompt("Method"), account=prompt("Account"), trx=prompt("Transaction ID");
+    const amt=parseFloat(prompt("Deposit Amount (Min 100)","100"));
+    if(!name||!method||!account||!trx||!amt||amt<100) return alert("All fields required, min 100 Rs");
+    totalDeposit += amt;
+    db.ref('requests').push({user:userId,name,method,account,trx,type:'deposit',amount:amt,status:'pending',date:new Date().toLocaleDateString()});
+    db.ref('users/'+userId+'/totalDeposit').set(totalDeposit);
+    db.ref('users/'+userId+'/dailyHistory').push({date:new Date().toLocaleDateString(),deposit:amt,withdraw:0,status:'pending',reason:''});
+    alert("Deposit request sent!");
+    updateDailyRecord();
+}
+
+function withdraw(){
+    db.ref('users/'+userId).once('value').then(snap=>{
+        const u = snap.val() || {};
+        const b = u.balance || 0;
+        const totalDep = u.totalDeposit || 0;
+        const totalBets = u.totalBets || 0;
+
+        if(b<=0){ alert("Withdraw not allowed!"); return; }
+
+        const remainingBet = totalDep - totalBets;
+        if(remainingBet>0){
+            alert("Withdraw not allowed! You must bet "+remainingBet.toFixed(2)+" RS more before withdrawing.");
+            return;
+        }
+
+        const name=prompt("Name"), method=prompt("Method"), account=prompt("Account");
+        const amt=parseFloat(prompt("Withdraw Amount","200"));
+        if(!name||!method||!account||!amt||amt<1) return alert("All fields required");
+
+        db.ref('requests').push({user:userId,name,method,account,type:'withdraw',amount:amt,status:'pending',date:new Date().toLocaleDateString()});
+        db.ref('users/'+userId+'/dailyHistory').push({date:new Date().toLocaleDateString(),deposit:0,withdraw:amt,status:'pending',reason:''});
+        alert("Withdraw request sent!");
+        updateDailyRecord();
+    });
+}
+
+// ===== Daily Record =====
+function updateDailyRecord(){
+    const t = document.getElementById("dailyTable");
+    t.innerHTML="<tr><th>Date</th><th>Deposit</th><th>Withdraw</th><th>Status</th><th>Reason</th></tr>";
+    db.ref('users/'+userId+'/dailyHistory').once('value').then(snap=>{
+        snap.forEach(s=>{
+            const h=s.val();
+            t.innerHTML += `<tr>
+                <td>${h.date}</td>
+                <td>${h.deposit}</td>
+                <td>${h.withdraw}</td>
+                <td>${h.status||''}</td>
+                <td>${h.reason||''}</td>
+            </tr>`;
+        });
+    });
+}
+</script>
+</body>
+</html>
