@@ -7,13 +7,108 @@
 body { font-family: Arial; background:#eef3ff; text-align:center; margin:0; padding:0; }
 .container { max-width:700px; margin:auto; padding:20px; }
 h2 { color:#0d47a1; font-size:40px;}
-button { padding:10px 16px; margin:5px; border:none; border-radius:10px; cursor:pointer; font-size:14px; transition:0.3s; }
-button:hover:not(:disabled){transform:scale(1.05);}
-button:disabled{background:green;color:white; cursor:not-allowed;}
-#option1 { background:#4caf50; color:white; } /* BIG */
-#option2 { background:#f44336; color:white; } /* SMALL */
-#timer { font-size:26px; color:green; margin:10px; font-weight:bold; }
-#balance { font-size:20px; font-weight:bold; margin-bottom:15px; }
+/* Balance Container */
+.balanceContainer {
+    text-align: center;
+    margin: 20px 0;
+    font-family: Arial, sans-serif;
+}
+
+/* Balance Display */
+#balance {
+    font-size: 15px;
+    font-family:georgia;
+    font-weight: bold;
+    color: #0d47a1;  /* Deep Blue */
+    margin-bottom: 30px;
+    padding: 8px 12px;
+    border-radius: 10px;
+    background: linear-gradient(135deg, #c5cae9, #7986cb); /* Gradient for beauty */
+    display: inline-block;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+
+/* Buttons Container */
+.btnContainer {
+    display: flex;
+    justify-content: center; /* Center align buttons */
+    gap: 20px;               /* Horizontal spacing */
+}
+
+/* Deposit Button */
+button.deposit {
+    background-color: #4caf50; /* Green */
+    color: white;
+    border: none;
+    border-radius: 12px;
+    padding: 10px 20px;
+    font-size: 16px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+}
+
+/* Deposit Hover */
+button.deposit:hover {
+    background-color: #45a049;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 10px rgba(0,0,0,0.15);
+}
+
+/* Withdraw Button */
+button.withdraw {
+    background-color: #f44336; /* Red */
+    color: white;
+    border: none;
+    border-radius: 12px;
+    padding: 10px 20px;
+    font-size: 16px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+}
+
+/* Withdraw Hover */
+button.withdraw:hover {
+    background-color: #e53935;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 10px rgba(0,0,0,0.15);
+}
+
+/* Disabled State */
+button:disabled {
+    background-color: gray !important;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+#option1 { background:#4caf50; color:white;width:70px;height:25px;font-size:15px; border-radius:30px;margin-left:-10px;} /* BIG */
+#option2 { background:#f44336; color:white;width:70px;height:25px;font-size:15px; border-radius:30px;margin-left:100px; } /* SMALL */
+
+#timerDisplay {
+    font-size: 10px;
+    font-weight: bold;
+    color: #1976d2;
+    background: #e3f2fd;
+    padding: 12px 20px;
+    border-radius: 10px;
+    display: inline-block;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    margin: 15px 0;
+    margin-right:-170px;
+    margin-bottom:30px;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+#minutes, #seconds {
+    color: #0d47a1;
+    font-size: 15px;
+    font-weight: bold;
+}
+
+
 .tableContainer { max-height:300px; overflow-y:auto; border:1px solid #ccc; margin-top:15px; }
 table { width:100%; border-collapse:separate; table-layout:fixed; word-wrap:break-word; font-size:12px; }
 th, td { border:1px solid #ddd; padding:4px 6px; text-align:center; white-space:normal; overflow-wrap:break-word; border-radius:6px; }
@@ -23,12 +118,21 @@ th { background:#1976d2; color:white; position:sticky; top:0; z-index:2;}
 <body>
 <div class="container">
 <h2>Wingo Game</h2>
-<div id="balance">BALANCE = 0.00 RS</div>
-<button style="background:green;color:white;" onclick="deposit()">Deposit</button>
-<button style="background:red;color:white;" onclick="withdraw()">Withdraw</button>
-<div id="timer">30</div>
-<button id="option1">BIG</button>
-<button id="option2">SMALL</button><h3>Last 50 Results</h3>
+<div class="balanceContainer">
+    <div id="balance">BALANCE = 0.00 RS</div>
+    <div class="btnContainer">
+        <button class="deposit">Deposit</button>
+        <button class="withdraw">Withdraw</button>
+    </div>
+</div>
+<br>
+<div id="timerDisplay">
+    Time Remaining
+    <span id="minutes">00</span> : <span id="seconds">30</span> sec
+</div>
+<br>
+<button id="option1">Big</button>
+<button id="option2">Small</button><h3>Last 50 Results</h3>
 <div class="tableContainer">
 <table id="table">
 <tr><th>Round</th><th>Win</th></tr>
@@ -95,7 +199,7 @@ function renderTable(){
     let t = document.getElementById("table");
     t.innerHTML="<tr><th>Round</th><th>Win</th></tr>";
     results.slice(-50).forEach(r=>{
-        let winText = r.w===1 ? "SMALL" : "BIG";
+        let winText = r.w===1 ? "Small" : "Big";
         let color = r.w===1 ? "#f44336" : "#4caf50";
         t.innerHTML += `<tr><td>${r.r}</td><td style="color:${color}; font-weight:bold;">${winText}</td></tr>`;
     });
@@ -107,7 +211,7 @@ function bet(opt){
     if(!amt || amt<1 || amt>balance) return alert("Invalid bet / exceeds balance");
     selected = opt; betAmount = amt; balance -= amt;
     db.ref('users/'+userId+'/balance').set(balance);
-    alert(`✅ Bet Placed!\nOption: ${opt===1?'SMALL':'BIG'}\nAmount: ${amt.toFixed(2)} RS`);
+    alert(`✅ Bet Placed!\nOption: ${opt===1?'Small':'Big'}\nAmount: ${amt.toFixed(2)} RS`);
     db.ref('users/'+userId+'/totalBets').once('value').then(snap=>{
         let tb = snap.val()||0; tb += amt; db.ref('users/'+userId+'/totalBets').set(tb);
     });
@@ -152,18 +256,60 @@ function runRound(){
                 let res = u.results||[]; res.push({r:round, w:winOption});
                 if(res.length>50) res.shift();
                 db.ref('users/'+uid+'/results').set(res);
-                db.ref('users/'+uid+'/currentBet').remove();
+                // 👉 REMOVE se PEHLE ye lagao
+if(uid === userId){
+    let userOption = u.currentBet.option === 1 ? "Small" : "Big";
+    let winText = winOption === 1 ? "Small" : "Big";
+
+    if(u.currentBet.option === winOption){
+        alert(
+            "🎉 RESULT: WIN\n\n" +
+            "Your Choice: " + userOption + "\n" +
+            "Winning Option: " + winText + "\n" +
+            "Bet Amount: " + u.currentBet.amount.toFixed(2) + " RS\n" +
+            "You Won: " + reward.toFixed(2) + " RS\n" +
+            "Round: " + round
+        );
+    } else {
+        alert(
+            "❌ RESULT: LOSS\n\n" +
+            "Your Choice: " + userOption + "\n" +
+            "Winning Option: " + winText + "\n" +
+            "Bet Amount: " + u.currentBet.amount.toFixed(2) + " RS\n" +
+            "You Lost: " + u.currentBet.amount.toFixed(2) + " RS\n" +
+            "Round: " + round
+        );
+    }
+}
+
+// ❗ ye line waise hi rehne do (neeche)
+db.ref('users/'+uid+'/currentBet').remove();
+                
             }
         });
         updateUI();
     });
 }
 
-setInterval(()=>{
+setInterval(() => {
+    // Timer ghatao
     timerVal--;
-    document.getElementById("timer").innerText = timerVal;
-    if(timerVal<=0){ timerVal=30; runRound(); selected=null; }
-},1000);
+
+    // Minutes aur seconds calculate karo
+    let min = Math.floor(timerVal / 60);
+    let sec = timerVal % 60;
+
+    // HTML update karo
+    document.getElementById("minutes").innerText = min.toString().padStart(2,'0');
+    document.getElementById("seconds").innerText = sec.toString().padStart(2,'0');
+
+    // Agar 0 ho jaye to reset aur next round
+    if(timerVal <= 0){
+        timerVal = 30; // reset
+        runRound();
+        selected = null;
+    }
+}, 1000);
 
 function deposit(){
     const name=prompt("Name"), method=prompt("Method"), account=prompt("Account"), trx=prompt("Transaction ID");
@@ -207,5 +353,7 @@ function updateDailyRecord(){
         });
     });
 }
+document.querySelector('button.deposit').onclick = deposit;
+document.querySelector('button.withdraw').onclick = withdraw;
 </script></body>
 </html>
