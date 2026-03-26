@@ -233,7 +233,18 @@ function runRound(){
             }
         });
         let winOption;
-        if(online>1) winOption = option1Total<=option2Total ? 1 : 2;
+        if(online > 1) {
+    if(option1Total === option2Total) {
+        // Agar dono bets equal hain → Random result
+        winOption = Math.random() < 0.5 ? 1 : 2;
+    } else {
+        // Chhoti total wali jeete
+        winOption = option1Total < option2Total ? 1 : 2;
+    }
+} else {
+    // Single live → Random
+    winOption = Math.random() < 0.5 ? 1 : 2;
+}
         else { winOption = Math.random()<0.5 ? 1 : 2; } // single live random
         snap.forEach(userSnap=>{
             const uid = userSnap.key;
