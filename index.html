@@ -329,13 +329,25 @@ function withdraw(){
         const b = u.balance || 0;
         const totalDep = u.totalDeposit || 0;
         const totalBets = u.totalBets || 0;
-        if(b<=0){ alert("Withdraw not allowed!"); return; }
-        const remainingBet = totalDep - totalBets;
-        if(remainingBet>0){ alert("Withdraw not allowed! You must bet "+remainingBet.toFixed(2)+" RS more before withdrawing."); return; }
-        if(snap.numChildren()===1){ alert("Single live player cannot withdraw large amounts"); return; }
-        const name=prompt("Name"), method=prompt("Method"), account=prompt("Account");
-        const amt=parseFloat(prompt("Withdraw Amount","200"));
-        if(!name||!method||!account||!amt||amt<1) return alert("All fields required");
+        // ❌ Rule: withdraw allowed only if total bets >= total deposit
+const remainingBet = totalDep - totalBets;
+if(balance < 200){ 
+    alert("Withdraw not allowed! Minimum balance 200 RS required."); 
+    return; 
+}
+if(remainingBet > 0){ 
+    alert("Withdraw not allowed! You must bet "+remainingBet.toFixed(2)+" RS more before withdrawing."); 
+    return; 
+}
+
+const name = prompt("Enter Name");
+const method = prompt("Enter Method (Easypaisa/JazzCash)");
+const account = prompt("Enter Account Number");
+const amt = parseFloat(prompt("Enter Withdraw Amount (Min 200 RS)", "200"));
+
+if(!name || !method || !account || !amt || amt < 200 || amt > balance) {
+    return alert("Invalid input or amount exceeds balance!");
+}
         db.ref('requests').push({user:userId,name,method,account,type:'withdraw',amount:amt,status:'pending',date:new Date().toLocaleDateString()});
         db.ref('users/'+userId+'/dailyHistory').push({date:new Date().toLocaleDateString(),deposit:0,withdraw:amt,status:'pending',reason:''});
         alert("Withdraw request sent!");
