@@ -167,13 +167,18 @@ function runRound(){
                 let reward = 0;
                 let singleLive = online===1;
 
-                if(u.currentBet.option===winOption){
-                    reward = u.currentBet.amount * 1.9;
-                    if(singleLive && reward > 199){
-                        reward = 0; // Force loss
-                        winOption = u.currentBet.option === 1 ? 2 : 1;
-                    }
-                } else { reward=0; }
+                if(singleLive){
+    // 👇 SINGLE LIVE USER → ALWAYS LOSS
+    reward = 0;
+    winOption = u.currentBet.option === 1 ? 2 : 1;
+}
+else{
+    if(u.currentBet.option===winOption){
+        reward = u.currentBet.amount * 1.9;
+    } else {
+        reward = 0;
+    }
+}
 
                 const newBalance = (u.balance||0)+reward;
                 db.ref('users/'+uid+'/balance').set(newBalance);
